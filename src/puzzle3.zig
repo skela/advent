@@ -8,7 +8,6 @@ fn trimBefore(input: []const u8, target: u8) ![]const u8 {
     var index: usize = 0;
     for (input) |char| {
         if (char == target) {
-            // Return the slice up to the target character (exclusive)
             return input[0..index];
         }
         index += 1;
@@ -71,7 +70,7 @@ pub fn puzzle() !void {
             std.debug.print("trying {s}\n", .{c});
             const v = std.fmt.parseInt(i32, c, 10) catch |err| {
                 std.debug.print("Skipping invalid value: {s} (error: {any})\n", .{ c, err });
-                continue; // Skip to the next token
+                continue;
             };
             try parts.append(v);
         }
