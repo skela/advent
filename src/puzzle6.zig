@@ -19,6 +19,11 @@ const Traversed = struct {
     }
 };
 
+const Route = struct {
+    path: []Point,
+    success: bool,
+};
+
 const Point = struct {
     symbol: u8,
     x: usize,
@@ -33,12 +38,14 @@ const Point = struct {
         self.traversed.reset();
     }
 
-    fn navigateMap(guard: *Point, map: Map) bool {
+    fn navigateMap(guard: *Point, map: Map) !Route {
         var x: usize = 0;
         var y: usize = 0;
+        const allocator = std.heap.page_allocator;
+        var path = std.ArrayList(Point).init(allocator);
         while (guard.x != 0 or guard.y != 0 or guard.x < map.bwidth or guard.y < map.bheight) {
             if (guard.traversed.all()) {
-                return false;
+                return Route{ .path = path.items, .success = false };
             }
             var turndir: u8 = '#';
             switch (guard.symbol) {
@@ -65,11 +72,13 @@ const Point = struct {
                 else => {},
             }
 
-            if (checkTraversed(map, guard, x, y)) return false;
+            if (checkTraversed(map, guard, x, y)) return Route{ .path = path.items, .success = false };
 
             if (guard.x == 0 or guard.y == 0 or guard.x == map.bwidth or guard.y == map.bheight) {
-                return true;
+                return Route{ .path = path.items, .success = true };
             }
+            const op = getPoint(map, guard.x, guard.y);
+            try path.append(op);
             markPoint(map, guard);
             markTraversed(map, guard);
             var p = getPoint(map, x, y);
@@ -86,14 +95,14 @@ const Point = struct {
             // printMap(map, guard);
 
             if (guard.traversed.all()) {
-                return false;
+                return Route{ .path = path.items, .success = false };
             }
             // std.debug.print("Where is guard: {d},{d}\n", .{ guard.x, guard.y });
             if (guard.x == 0 or guard.y == 0 or guard.x == map.bwidth or guard.y == map.bheight) {
-                return true;
+                return Route{ .path = path.items, .success = true };
             }
         }
-        return true;
+        return Route{ .path = path.items, .success = true };
     }
 
     fn updateSymbol(self: *Point, symbol: u8) void {
@@ -257,7 +266,7 @@ pub fn puzzle() !void {
 
     // printMap(map, guard);
 
-    _ = guard.navigateMap(map);
+    const originalRoute = try guard.navigateMap(map);
 
     // std.debug.print("\n", .{});
     // printMap(map, guard);
@@ -271,8 +280,8 @@ pub fn puzzle() !void {
     x = 0;
     y = 0;
     var stuck: i32 = 0;
-    for (0..map.points.len) |i| {
-        const p = map.points[i];
+    for (0..originalRoute.path.len) |i| {
+        const p = originalRoute.path[i];
         if (p.symbol != '.') {
             continue;
         }
@@ -281,8 +290,8 @@ pub fn puzzle() !void {
 
         // std.debug.print("\n", .{});
         // printMap(map, guard);
-        const navigated = guard.navigateMap(map);
-        if (!navigated) {
+        const route = try guard.navigateMap(map);
+        if (!route.success) {
             stuck += 1;
         }
         guard.reset(originalGuard);
@@ -292,4 +301,5 @@ pub fn puzzle() !void {
     print("Number of obstacle positions: {d}", .{stuck});
 
     defer points.deinit();
+    defer originalPoints.deinit();
 }
