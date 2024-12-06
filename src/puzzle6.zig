@@ -1,4 +1,5 @@
 const std = @import("std");
+pub const print = @import("utils.zig").print;
 
 const Traversed = struct {
     north: bool,
@@ -94,6 +95,10 @@ const Point = struct {
         }
         return true;
     }
+
+    fn updateSymbol(self: *Point, symbol: u8) void {
+        self.symbol = symbol;
+    }
 };
 
 const Map = struct {
@@ -117,22 +122,20 @@ const south = 'v';
 
 const obstacle = '#';
 
+fn getPointIndex(map: Map, x: usize, y: usize) usize {
+    // for (0..map.points.len) |i| {
+    //     if (map.points[i].x == x and map.points[i].y == y) return i;
+    // }
+    // return 0;
+    return y * map.width + x;
+}
+
 fn getPoint(map: Map, x: usize, y: usize) Point {
-    for (map.points) |p| {
-        if (p.x == x and p.y == y) return p;
-    }
-    return Point{ .symbol = '.', .x = 0, .y = 0, .traversed = Traversed{ .north = false, .south = false, .east = false, .west = false } };
+    return map.points[getPointIndex(map, x, y)];
 }
 
 fn addObstacle(map: Map, x: usize, y: usize) void {
-    var index: usize = 0;
-    for (map.points) |p| {
-        if (p.x == x and p.y == y) {
-            break;
-        }
-        index += 1;
-    }
-    map.points[index].symbol = '#';
+    map.points[getPointIndex(map, x, y)].symbol = '#';
 }
 
 fn checkTraversed(map: Map, guard: *Point, x: usize, y: usize) bool {
@@ -157,28 +160,11 @@ fn checkTraversed(map: Map, guard: *Point, x: usize, y: usize) bool {
 }
 
 fn markPoint(map: Map, guard: *Point) void {
-    var index: usize = 0;
-    const x = guard.x;
-    const y = guard.y;
-    for (map.points) |p| {
-        if (p.x == x and p.y == y) {
-            break;
-        }
-        index += 1;
-    }
-    map.points[index].symbol = 'X';
+    map.points[getPointIndex(map, guard.x, guard.y)].symbol = 'X';
 }
 
 fn markTraversed(map: Map, guard: *Point) void {
-    var index: usize = 0;
-    const x = guard.x;
-    const y = guard.y;
-    for (map.points) |p| {
-        if (p.x == x and p.y == y) {
-            break;
-        }
-        index += 1;
-    }
+    const index: usize = getPointIndex(map, guard.x, guard.y);
     switch (guard.symbol) {
         north => {
             map.points[index].traversed.north = true;
@@ -266,21 +252,21 @@ pub fn puzzle() !void {
     const originalGuard = Point{ .symbol = guard.symbol, .x = guard.x, .y = guard.y, .traversed = Traversed{ .north = false, .south = false, .east = false, .west = false } };
     var map = Map{ .points = points.items, .width = width, .height = height, .bwidth = width - 1, .bheight = height - 1 };
 
-    std.debug.print("Map is {d}x{d}\n", .{ map.width, map.height });
-    std.debug.print("Where is guard: {d},{d}\n", .{ guard.x, guard.y });
+    // std.debug.print("Map is {d}x{d}\n", .{ map.width, map.height });
+    // std.debug.print("Where is guard: {d},{d}\n", .{ guard.x, guard.y });
 
-    printMap(map, guard);
+    // printMap(map, guard);
 
     _ = guard.navigateMap(map);
 
-    std.debug.print("\n", .{});
-    printMap(map, guard);
+    // std.debug.print("\n", .{});
+    // printMap(map, guard);
     const positions = countMarks(map) + 1;
-    std.debug.print("Had {d} positions\n", .{positions});
+    print("Visited positions: {d}", .{positions});
 
     guard.reset(originalGuard);
     map.reset(originalPoints.items);
-    printMap(map, guard);
+    // printMap(map, guard);
 
     x = 0;
     y = 0;
@@ -290,7 +276,7 @@ pub fn puzzle() !void {
         if (p.symbol != '.') {
             continue;
         }
-        std.debug.print("Checking obstacle at {d},{d}\n", .{ p.x, p.y });
+        // std.debug.print("Checking obstacle at {d},{d}\n", .{ p.x, p.y });
         addObstacle(map, p.x, p.y);
 
         // std.debug.print("\n", .{});
@@ -303,7 +289,7 @@ pub fn puzzle() !void {
         map.reset(originalPoints.items);
     }
 
-    std.debug.print("Stuck {d}\n", .{stuck});
+    print("Number of obstacle positions: {d}", .{stuck});
 
     defer points.deinit();
 }
