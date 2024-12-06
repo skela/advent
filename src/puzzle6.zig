@@ -277,8 +277,6 @@ pub fn puzzle() !void {
     map.reset(originalPoints.items);
     // printMap(map, guard);
 
-    x = 0;
-    y = 0;
     var stuck: i32 = 0;
     for (0..originalRoute.path.len) |i| {
         const p = originalRoute.path[i];
