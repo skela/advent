@@ -36,6 +36,7 @@ pub fn puzzle() !void {
             var parts = split(u8, c2r, " ");
 
             var vars = std.ArrayList(i64).init(allocator);
+
             while (parts.next()) |p| {
                 if (p.len == 0) {
                     continue;
