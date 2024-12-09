@@ -53,7 +53,9 @@ pub fn puzzle() !void {
                     if (left.type == DataType.freespace and right.type == DataType.block) {
                         filesystem.items[i] = right;
                         filesystem.items[j] = left;
-                        // printFilesystem(filesystem);
+                        if (verbose) {
+                            printFilesystem(filesystem);
+                        }
                     }
                 }
             }
