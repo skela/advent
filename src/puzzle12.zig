@@ -9,8 +9,10 @@ const verbose: bool = false;
 pub fn puzzle() !void {
     var points = std.ArrayList(Point).init(std.heap.page_allocator);
     defer points.deinit();
-    var regions = std.AutoArrayHashMap(i32, std.ArrayList(Point)).init(std.heap.page_allocator);
-    defer regions.deinit();
+    var pointsn = std.ArrayList(Point).init(std.heap.page_allocator);
+    defer pointsn.deinit();
+    var areas = std.AutoArrayHashMap(u8, std.ArrayList(Point)).init(std.heap.page_allocator);
+    defer areas.deinit();
 
     var labels = std.AutoArrayHashMap(u8, bool).init(std.heap.page_allocator);
     defer labels.deinit();
@@ -29,7 +31,7 @@ pub fn puzzle() !void {
         }
         x = 0;
         for (line) |c| {
-            const p = Point{ .label = c, .x = x, .y = y, .region = 0 };
+            const p = Point{ .label = c, .x = x, .y = y, .region = 0, .sides = 0 };
             try points.append(p);
             x += 1;
 
@@ -46,37 +48,15 @@ pub fn puzzle() !void {
 
     printMap(map);
 
-    const directions: [4]Direction = [_]Direction{
-        Direction.up,
-        Direction.down,
-        Direction.left,
-        Direction.right,
-    };
     // print("Regions: {any}", .{labels.keys()});
-    const currentId: i32 = 1;
-    map.points[0].updateRegion(currentId);
     // for (labels.keys()) |label| {
-    for (map.points) |p| {
-        for (directions) |d| {
-            const next = switch (d) {
-                Direction.up => getUp(map, p),
-                Direction.down => getDown(map, p),
-                Direction.left => getLeft(map, p),
-                Direction.right => getRight(map, p),
-            };
-            if (next) |n| {
-                if (n.label != p.label) {
-                    continue;
-                }
-                if (n.region != 0) {
-                    continue;
-                }
-                n.updateRegion(currentId);
-            }
-        }
+    for (0..map.points.len) |i| {
+        try map.points[i].navigateMap(areas, map);
     }
 
-    printRegion(map, currentId);
+    for (areas.keys()) |k| {
+        printRegion(map, k);
+    }
 }
 
 const Point = struct {
@@ -84,9 +64,48 @@ const Point = struct {
     x: usize,
     y: usize,
     region: i32,
+    sides: usize,
 
     fn updateRegion(self: *Point, region: i32) void {
         self.region = region;
+    }
+
+    fn addSide(self: *Point) void {
+        self.sides += 1;
+    }
+
+    fn navigateMap(self: *Point, areas: std.AutoArrayHashMap(u8, std.ArrayList(Point)), map: Map) !void {
+        const directions: [4]Direction = [_]Direction{
+            Direction.up,
+            Direction.down,
+            Direction.left,
+            Direction.right,
+        };
+
+        for (directions) |d| {
+            const next = switch (d) {
+                Direction.up => getUp(map, self),
+                Direction.down => getDown(map, self),
+                Direction.left => getLeft(map, self),
+                Direction.right => getRight(map, self),
+            };
+            if (next) |np| {
+                var n = &np;
+                if (n.label != self.label) {
+                    self.sides += 1;
+                    continue;
+                }
+                if (areas.getPtr(self.label)) |list| {
+                    try list.append(self);
+                } else {
+                    var points = std.ArrayList(Point).init(std.heap.page_allocator);
+                    try points.append(&self);
+                }
+                n.navigateMap(areas, map);
+            } else {
+                self.sides += 1;
+            }
+        }
     }
 };
 
@@ -94,6 +113,7 @@ const Region = struct {
     id: i32,
     label: u8,
     points: []Point,
+    sides: i32,
 };
 
 const Map = struct {
@@ -144,22 +164,22 @@ fn printRegion(map: Map, region: i32) void {
 
 const Direction = enum(u8) { up = 0, down = 1, left = 2, right = 3 };
 
-fn getUp(self: Map, p: Point) ?Point {
+fn getUp(self: Map, p: *Point) ?Point {
     if (p.y == 0) return null;
     return getPoint(self, p.x, p.y - 1);
 }
 
-fn getDown(self: Map, p: Point) ?Point {
+fn getDown(self: Map, p: *Point) ?Point {
     if (p.y == self.bheight) return null;
     return getPoint(self, p.x, p.y + 1);
 }
 
-fn getLeft(self: Map, p: Point) ?Point {
+fn getLeft(self: Map, p: *Point) ?Point {
     if (p.x == 0) return null;
     return getPoint(self, p.x - 1, p.y);
 }
 
-fn getRight(self: Map, p: Point) ?Point {
+fn getRight(self: Map, p: *Point) ?Point {
     if (p.x == self.bwidth) return null;
     return getPoint(self, p.x + 1, p.y);
 }
