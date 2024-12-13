@@ -3,14 +3,17 @@ pub const print = @import("utils.zig").print;
 
 const Task = enum { one, two };
 const task: Task = Task.one;
-const sample: bool = true;
-const verbose: bool = true;
+const sample: bool = false;
+const verbose: bool = false;
 
 pub fn puzzle() !void {
     var points = std.ArrayList(Point).init(std.heap.page_allocator);
     defer points.deinit();
     var labels = std.AutoArrayHashMap(u8, bool).init(std.heap.page_allocator);
     defer labels.deinit();
+
+    var visitedEdges = std.AutoArrayHashMap(Edge, bool).init(std.heap.page_allocator);
+    defer visitedEdges.deinit();
 
     const file = @embedFile(if (sample) "puzzle12.data.sample" else "puzzle12.data");
     const split = std.mem.split;
@@ -40,7 +43,7 @@ pub fn puzzle() !void {
     height = y;
 
     const map = Map{ .points = points.items, .width = width, .height = height, .bwidth = width - 1, .bheight = height - 1 };
-    var ctx = Context{ .map = map, .labels = labels };
+    var ctx = Context{ .map = map, .labels = labels, .visitedEdges = visitedEdges };
     ctx.printMap();
 
     const directions: [4]Direction = [_]Direction{
@@ -169,6 +172,7 @@ fn turnDirection(direction: Direction) Direction {
 const Context = struct {
     map: Map,
     labels: std.AutoArrayHashMap(u8, bool),
+    visitedEdges: std.AutoArrayHashMap(Edge, bool),
 
     fn getPointIndex(self: *Context, x: i32, y: i32) usize {
         return @intCast(y * self.map.width + x);
@@ -296,10 +300,10 @@ const Context = struct {
         }
 
         var sides: usize = 0;
-        sides += uniqueSides(top.items, false);
-        sides += uniqueSides(left.items, true);
-        sides += uniqueSides(right.items, true);
-        sides += uniqueSides(bottom.items, false);
+        sides += try self.uniqueSides(top.items);
+        sides += try self.uniqueSides(left.items);
+        sides += try self.uniqueSides(right.items);
+        sides += try self.uniqueSides(bottom.items);
         return sides;
         // var allPoints = std.ArrayList(Edge).init(std.heap.page_allocator);
 
@@ -357,23 +361,24 @@ const Context = struct {
         // return sidesCount;
     }
 
-    fn uniqueSides(edge: []const Edge, vertical: bool) usize {
-        var visited = std.ArrayList(Edge).init(std.heap.page_allocator);
-        defer visited.deinit();
+    fn uniqueSides(self: *Context, edge: []const Edge) !usize {
         var count: usize = edge.len;
-        for (0..edge.len - 1) |i| {
-            const e1 = edge[i];
-            const e2 = edge[i + 1];
-            if (vertical) {
-                if (e1.x == e2.x and @abs(e2.y - e1.y) == 1) {
-                    count -= 1;
+        for (edge) |e1| {
+            try self.visitedEdges.put(e1, true);
+            for (edge) |e2| {
+                if (self.visitedEdges.contains(e2) or e1.direction != e2.direction) {
+                    continue;
                 }
-            } else {
-                if (e1.y == e2.y and @abs(e2.x - e1.x) == 1) {
+
+                const dx = @abs(e2.x - e1.x);
+                const dy = @abs(e2.y - e1.y);
+
+                if (dx == 0 and dy == 1 or dx == 1 and dy == 0) {
                     count -= 1;
                 }
             }
         }
+
         return count;
     }
 
