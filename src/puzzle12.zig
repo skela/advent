@@ -253,59 +253,151 @@ const Context = struct {
         if (region.len == 0) {
             return 0;
         }
-        // var visited = std.AutoArrayHashMap(Vector, bool).init(std.heap.page_allocator);
-        // defer visited.deinit();
+        var edges = std.AutoArrayHashMap(Edge, bool).init(std.heap.page_allocator);
+        defer edges.deinit();
+        // var visitedy = std.AutoArrayHashMap(Direction, YEdge).init(std.heap.page_allocator);
+        // defer visitedy.deinit();
+
+        const directions: [4]Direction = [_]Direction{
+            Direction.up,
+            Direction.down,
+            Direction.left,
+            Direction.right,
+        };
 
         var unique_sides: usize = 0;
         for (region) |point| {
-            unique_sides += try self.numberOfCorners(point);
+            for (directions) |direction| {
+                const np = self.getDirection(point, direction);
+                if (!isInside(np, point.region)) {
+                    if (np) |_| {
+                        try edges.put(Edge{ .direction = direction }, true);
+                    } else {
+                        try edges.put(Edge{ .direction = direction }, true);
+                    }
+                }
+            }
+            // if (try self.numberOfCorners(point)) {
+            //     unique_sides += 1;
+            // }
         }
+        unique_sides = edges.keys().len;
         return unique_sides;
     }
 
-    fn numberOfCorners(self: *Context, point: Point) !usize {
+    fn isInside(tl: ?Point, region: i32) bool {
+        if (tl) |n| {
+            if (n.region != region) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    fn numberOfCorners(self: *Context, point: Point) !bool {
         const tl = self.getPointDelta(point, -1, -1);
         const tr = self.getPointDelta(point, 1, -1);
         const bl = self.getPointDelta(point, -1, 1);
         const br = self.getPointDelta(point, 1, 1);
+        const u = self.getPointDelta(point, 0, -1);
+        const d = self.getPointDelta(point, 0, 1);
+        const l = self.getPointDelta(point, -1, 0);
+        const r = self.getPointDelta(point, 1, 0);
 
-        var corners: usize = 0;
+        var tlb: bool = false;
         if (tl) |n| {
             if (n.region != point.region) {
-                corners += 1;
+                tlb = true;
             }
         } else {
-            corners += 1;
+            tlb = true;
         }
+        var trb: bool = false;
         if (tr) |n| {
             if (n.region != point.region) {
-                corners += 1;
+                trb = true;
             }
         } else {
-            corners += 1;
+            trb = true;
         }
+        var blb: bool = false;
         if (bl) |n| {
             if (n.region != point.region) {
-                corners += 1;
+                blb = true;
             }
         } else {
-            corners += 1;
+            blb = true;
         }
+        var brb: bool = false;
         if (br) |n| {
             if (n.region != point.region) {
-                corners += 1;
+                brb = true;
             }
         } else {
-            corners += 1;
+            brb = true;
         }
-        return corners;
+        var lb: bool = false;
+        if (l) |n| {
+            if (n.region != point.region) {
+                lb = true;
+            }
+        } else {
+            lb = true;
+        }
+        var rb: bool = false;
+        if (r) |n| {
+            if (n.region != point.region) {
+                rb = true;
+            }
+        } else {
+            rb = true;
+        }
+        var ub: bool = false;
+        if (u) |n| {
+            if (n.region != point.region) {
+                ub = true;
+            }
+        } else {
+            ub = true;
+        }
+        var db: bool = false;
+        if (d) |n| {
+            if (n.region != point.region) {
+                db = true;
+            }
+        } else {
+            db = true;
+        }
+
+        if (tlb and brb) {
+            return true;
+        }
+        if (trb and blb) {
+            return true;
+        }
+
+        return false;
     }
 };
 
 const Edge = struct {
-    start: Point,
-    end: ?Point,
+    direction: Direction,
 };
+
+const XEdge = struct {
+    x: usize,
+    direction: Direction,
+    label: u8,
+};
+
+const YEdge = struct {
+    y: usize,
+    direction: Direction,
+    label: u8,
+};
+
 const Vector = struct {
     x: usize,
     y: usize,
