@@ -16,10 +16,10 @@ pub fn puzzle() !void {
     const split = std.mem.split;
     var splits = split(u8, file, "\n");
 
-    var x: usize = 0;
-    var y: usize = 0;
-    var width: usize = 0;
-    var height: usize = 0;
+    var x: i32 = 0;
+    var y: i32 = 0;
+    var width: i32 = 0;
+    var height: i32 = 0;
     while (splits.next()) |line| {
         if (line.len == 0) {
             continue;
@@ -149,10 +149,10 @@ pub fn puzzle() !void {
 
 const Point = struct {
     label: u8,
-    x: usize,
-    y: usize,
+    x: i32,
+    y: i32,
     region: i32,
-    sides: usize,
+    sides: i32,
 };
 
 const Direction = enum(u8) { up = 0, down = 1, left = 2, right = 3 };
@@ -170,11 +170,11 @@ const Context = struct {
     map: Map,
     labels: std.AutoArrayHashMap(u8, bool),
 
-    fn getPointIndex(self: *Context, x: usize, y: usize) usize {
-        return y * self.map.width + x;
+    fn getPointIndex(self: *Context, x: i32, y: i32) usize {
+        return @intCast(y * self.map.width + x);
     }
 
-    fn getPoint(self: *Context, x: usize, y: usize) Point {
+    fn getPoint(self: *Context, x: i32, y: i32) Point {
         return self.map.points[getPointIndex(self, x, y)];
     }
 
@@ -264,8 +264,6 @@ const Context = struct {
         defer left.deinit();
         var right = std.ArrayList(Edge).init(std.heap.page_allocator);
         defer right.deinit();
-        // var visitedy = std.AutoArrayHashMap(Direction, YEdge).init(std.heap.page_allocator);
-        // defer visitedy.deinit();
 
         const directions: [4]Direction = [_]Direction{
             Direction.up,
@@ -274,7 +272,7 @@ const Context = struct {
             Direction.right,
         };
 
-        var unique_sides: usize = 0;
+        // var unique_sides: usize = 0;
         for (region) |point| {
             for (directions) |direction| {
                 const np = self.getDirection(point, direction);
@@ -296,32 +294,104 @@ const Context = struct {
             //     unique_sides += 1;
             // }
         }
-        unique_sides = top.items.len + left.items.len + right.items.len + bottom.items.len;
-        var edge = top.pop();
-        for (top.items) |e| {
-            if (e.y - edge.y == 1) {
-                unique_sides -= 1;
+
+        var sides: usize = 0;
+        sides += uniqueSides(top.items, false);
+        sides += uniqueSides(left.items, true);
+        sides += uniqueSides(right.items, true);
+        sides += uniqueSides(bottom.items, false);
+        return sides;
+        // var allPoints = std.ArrayList(Edge).init(std.heap.page_allocator);
+
+        // unique_sides = top.items.len + left.items.len + right.items.len + bottom.items.len;
+        // var edge = top.pop();
+        // for (top.items) |e| {
+        //     if (e.y - edge.y == 1) {
+        //         unique_sides -= 1;
+        //     }
+        // }
+        // edge = bottom.pop();
+        // for (bottom.items) |e| {
+        //     if (e.y - edge.y == 1) {
+        //         unique_sides -= 1;
+        //     }
+        // }
+        // edge = left.pop();
+        // for (top.items) |e| {
+        //     if (e.x - edge.x == 1) {
+        //         unique_sides -= 1;
+        //     }
+        // }
+        // edge = right.pop();
+        // for (right.items) |e| {
+        //     if (e.x - edge.x == 1) {
+        //         unique_sides -= 1;
+        //     }
+        // }
+        // for (top.items) |point| {
+        //     try allPoints.append(point);
+        // }
+        // for (left.items) |point| {
+        //     try allPoints.append(point);
+        // }
+        // for (bottom.items) |point| {
+        //     try allPoints.append(point);
+        // }
+        // for (right.items) |point| {
+        //     try allPoints.append(point);
+        // }
+        //
+        // const pointCount = allPoints.items.len;
+        // var visited = std.ArrayList(bool).init(std.heap.page_allocator);
+        //
+        // for (0..pointCount) |_| try visited.append(false);
+        //
+        // var sidesCount: usize = 0;
+        //
+        // for (0..pointCount) |i| {
+        //     if (!visited.items[i]) {
+        //         dfs(allPoints.items, visited.items, i);
+        //         sidesCount += 1;
+        //     }
+        // }
+        // return sidesCount;
+    }
+
+    fn uniqueSides(edge: []const Edge, vertical: bool) usize {
+        var visited = std.ArrayList(Edge).init(std.heap.page_allocator);
+        defer visited.deinit();
+        var count: usize = edge.len;
+        for (0..edge.len - 1) |i| {
+            const e1 = edge[i];
+            const e2 = edge[i + 1];
+            if (vertical) {
+                if (e1.x == e2.x and @abs(e2.y - e1.y) == 1) {
+                    count -= 1;
+                }
+            } else {
+                if (e1.y == e2.y and @abs(e2.x - e1.x) == 1) {
+                    count -= 1;
+                }
             }
         }
-        edge = bottom.pop();
-        for (bottom.items) |e| {
-            if (e.y - edge.y == 1) {
-                unique_sides -= 1;
+        return count;
+    }
+
+    fn isConnected(p1: Edge, p2: Edge) bool {
+        const dx = @abs(p1.x - p2.x);
+        const dy = @abs(p1.x - p2.y);
+        return dx <= 1 and dy <= 1;
+    }
+
+    fn dfs(points: []const Edge, visited: []bool, node: usize) void {
+        if (visited[node]) return;
+        visited[node] = true;
+
+        for (0..points.len) |i| {
+            if (!visited[i] and isConnected(points[node], points[i])) {
+                dfs(points, visited, i);
             }
         }
-        edge = left.pop();
-        for (top.items) |e| {
-            if (e.x - edge.x == 1) {
-                unique_sides -= 1;
-            }
-        }
-        edge = right.pop();
-        for (right.items) |e| {
-            if (e.x - edge.x == 1) {
-                unique_sides -= 1;
-            }
-        }
-        return unique_sides;
     }
 
     fn dxDirection(direction: Direction, point: Point) ?usize {
@@ -441,25 +511,25 @@ const Context = struct {
 
 const Edge = struct {
     direction: Direction,
-    x: usize,
-    y: usize,
+    x: i32,
+    y: i32,
 };
 
 const XEdge = struct {
-    x: usize,
+    x: i32,
     direction: Direction,
     label: u8,
 };
 
 const YEdge = struct {
-    y: usize,
+    y: i32,
     direction: Direction,
     label: u8,
 };
 
 const Vector = struct {
-    x: usize,
-    y: usize,
+    x: i32,
+    y: i32,
     direction: Direction,
 };
 
@@ -472,8 +542,8 @@ const Region = struct {
 
 const Map = struct {
     points: []Point,
-    width: usize,
-    height: usize,
-    bwidth: usize,
-    bheight: usize,
+    width: i32,
+    height: i32,
+    bwidth: i32,
+    bheight: i32,
 };
