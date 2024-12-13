@@ -125,6 +125,7 @@ pub fn puzzle() !void {
     }
 
     var sum: i32 = 0;
+    var discount: i32 = 0;
     for (regions.items) |region| {
         var perimeter: i32 = 0;
         var area: i32 = 0;
@@ -132,9 +133,10 @@ pub fn puzzle() !void {
             perimeter += @intCast(p.sides);
             area += 1;
         }
-        const sides = try ctx.calculateUniqueSidesForRegion(region.points);
+        const sides: i32 = @intCast(try ctx.calculateUniqueSidesForRegion(region.points));
         print("Region {d} ({c}) area is {d} perimeter {d} - sides {d}", .{ region.id, region.label, area, perimeter, sides });
         sum += (perimeter * area);
+        discount += (area * sides);
         if (verbose) {
             ctx.printRegion(region.id);
             print("", .{});
@@ -142,6 +144,7 @@ pub fn puzzle() !void {
     }
 
     print("The sum is {d}", .{sum});
+    print("The discount is {d}", .{discount});
 }
 
 const Point = struct {
@@ -253,8 +256,14 @@ const Context = struct {
         if (region.len == 0) {
             return 0;
         }
-        var edges = std.AutoArrayHashMap(Edge, bool).init(std.heap.page_allocator);
-        defer edges.deinit();
+        var top = std.ArrayList(Edge).init(std.heap.page_allocator);
+        defer top.deinit();
+        var bottom = std.ArrayList(Edge).init(std.heap.page_allocator);
+        defer bottom.deinit();
+        var left = std.ArrayList(Edge).init(std.heap.page_allocator);
+        defer left.deinit();
+        var right = std.ArrayList(Edge).init(std.heap.page_allocator);
+        defer right.deinit();
         // var visitedy = std.AutoArrayHashMap(Direction, YEdge).init(std.heap.page_allocator);
         // defer visitedy.deinit();
 
@@ -270,10 +279,16 @@ const Context = struct {
             for (directions) |direction| {
                 const np = self.getDirection(point, direction);
                 if (!isInside(np, point.region)) {
-                    if (np) |_| {
-                        try edges.put(Edge{ .direction = direction }, true);
-                    } else {
-                        try edges.put(Edge{ .direction = direction }, true);
+                    switch (direction) {
+                        .up => try top.append(Edge{ .direction = direction, .x = point.x, .y = point.y }),
+                        .down => try bottom.append(Edge{ .direction = direction, .x = point.x, .y = point.y }),
+                        .left => try left.append(Edge{ .direction = direction, .x = point.x, .y = point.y }),
+                        .right => try right.append(Edge{ .direction = direction, .x = point.x, .y = point.y }),
+                        // if (np) |_| {
+                        //     try edges.put(Edge{ .direction = direction }, true);
+                        // } else {
+                        //     try edges.put(Edge{ .direction = direction }, true);
+                        // }
                     }
                 }
             }
@@ -281,8 +296,50 @@ const Context = struct {
             //     unique_sides += 1;
             // }
         }
-        unique_sides = edges.keys().len;
+        unique_sides = top.items.len + left.items.len + right.items.len + bottom.items.len;
+        var edge = top.pop();
+        for (top.items) |e| {
+            if (e.y - edge.y == 1) {
+                unique_sides -= 1;
+            }
+        }
+        edge = bottom.pop();
+        for (bottom.items) |e| {
+            if (e.y - edge.y == 1) {
+                unique_sides -= 1;
+            }
+        }
+        edge = left.pop();
+        for (top.items) |e| {
+            if (e.x - edge.x == 1) {
+                unique_sides -= 1;
+            }
+        }
+        edge = right.pop();
+        for (right.items) |e| {
+            if (e.x - edge.x == 1) {
+                unique_sides -= 1;
+            }
+        }
         return unique_sides;
+    }
+
+    fn dxDirection(direction: Direction, point: Point) ?usize {
+        return switch (direction) {
+            .up => null,
+            .down => null,
+            .left => point.x,
+            .right => point.x,
+        };
+    }
+
+    fn dyDirection(direction: Direction, point: Point) ?usize {
+        return switch (direction) {
+            .up => point.y,
+            .down => point.y,
+            .left => null,
+            .right => null,
+        };
     }
 
     fn isInside(tl: ?Point, region: i32) bool {
@@ -384,6 +441,8 @@ const Context = struct {
 
 const Edge = struct {
     direction: Direction,
+    x: usize,
+    y: usize,
 };
 
 const XEdge = struct {
