@@ -40,15 +40,8 @@ pub fn puzzle() !void {
         try robots.append(r);
     }
 
-    // const p = Point{ .x = 2, .y = 4 };
-    // const v = Velocity{ .dx = 2, .dy = -3 };
-    // const r0 = Robot{ .p = p, .v = v };
-    // try robots.append(r0);
-
-    const width: i64 = 101;
-    const height: i64 = 103;
-    // const width: i64 = 11;
-    // const height: i64 = 7;
+    const width: i64 = if (sample) 11 else 101;
+    const height: i64 = if (sample) 7 else 103;
 
     for (0..height) |y| {
         for (0..width) |x| {
@@ -173,12 +166,7 @@ const Context = struct {
 
     fn getIndex(self: *Context, x: i64, y: i64) usize {
         const p = self.getPoint(x, y);
-        // print("Getting index for {d},{d}", .{ p.x, p.y });
         return @intCast(p.y * self.map.width + p.x);
-    }
-
-    fn getCount(self: *Context, x: i64, y: i64) i64 {
-        return self.map.points[getIndex(self, x, y)];
     }
 
     fn printMap(self: *Context) void {
