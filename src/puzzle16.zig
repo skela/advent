@@ -2,29 +2,25 @@ const std = @import("std");
 pub const print = @import("utils.zig").print;
 
 const Task = enum { one, two };
-const DataSource = enum { sample, real };
-const task: Task = .two;
-const source: DataSource = .sample;
+const DataSource = enum { sample, sample2, real };
+const task: Task = .one;
+const source: DataSource = .real;
 
 const verbose: bool = switch (source) {
     .sample => true,
+    .sample2 => true,
     .real => false,
 };
 
 const filename: []const u8 = switch (source) {
     .sample => "puzzle16.data.sample",
+    .sample2 => "puzzle16.data.sample2",
     .real => "puzzle16.data",
 };
 
 pub fn puzzle() !void {
     var points = std.ArrayList(Point).init(std.heap.page_allocator);
     defer points.deinit();
-
-    var points2 = std.ArrayList(Point).init(std.heap.page_allocator);
-    defer points2.deinit();
-
-    var movements = std.ArrayList(Direction).init(std.heap.page_allocator);
-    defer movements.deinit();
 
     var x: i32 = 0;
     var y: i32 = 0;
@@ -49,7 +45,6 @@ pub fn puzzle() !void {
                 reindeer = p;
             }
             try points.append(p);
-            try points2.append(Point{ .label = c, .x = x, .y = y });
             x += 1;
         }
         width = x;
@@ -57,20 +52,149 @@ pub fn puzzle() !void {
     }
     height = y;
 
-    const map = Map{ .width = width, .height = height, .bwidth = width - 1, .bheight = height - 1, .points = points2 };
-    var ctx = Context{ .map = map, .reindeer = reindeer, .goal = goal, .points = points.items, .paths = std.ArrayList(Path).init(std.heap.page_allocator) };
+    var costs = std.AutoArrayHashMap(Vector, i64).init(std.heap.page_allocator);
+    defer costs.deinit();
+
+    const map = Map{ .width = width, .height = height, .bwidth = width - 1, .bheight = height - 1 };
+    var ctx = Context{ .map = map, .reindeer = reindeer, .goal = goal, .points = points.items, .paths = std.ArrayList(Path).init(std.heap.page_allocator), .costs = costs };
     ctx.printMap();
 
-    try ctx.go(Direction.right);
+    var movements = std.PriorityQueue(Movement, void, sortMovements).init(std.heap.page_allocator, undefined);
+    defer movements.deinit();
 
-    var score: i64 = std.math.maxInt(i64);
-    for (paths) |p| {
-        if (score > p.score) {
-            score = p.score;
+    const emp = std.ArrayList(Point).init(std.heap.page_allocator);
+    try movements.add(Movement{ .score = 0, .vector = Vector{ .point = reindeer, .direction = .right }, .path = emp.items });
+
+    var bestScore: i64 = std.math.maxInt(i64);
+    var numberOfBestScores: i64 = 0;
+
+    while (movements.items.len > 0) {
+        const m = movements.remove();
+        if (m.vector.point.x == goal.x and m.vector.point.y == goal.y) {
+            bestScore = m.score;
+
+            try ctx.createPath(m);
+            break;
+        }
+
+        if (ctx.costs.contains(m.vector)) {
+            continue;
+        }
+
+        try ctx.costs.put(m.vector, m.score);
+
+        var surroundings = std.ArrayList(Vector).init(std.heap.page_allocator);
+        defer surroundings.deinit();
+
+        for (directions) |direction| {
+            if (direction == reverse(m.vector.direction)) {
+                continue;
+            }
+            const v = velocity(direction);
+            try surroundings.append(Vector{ .point = ctx.getPoint(m.vector.point.x + v.dx, m.vector.point.y + v.dy), .direction = direction });
+        }
+
+        for (surroundings.items) |s| {
+            if (s.point.label == '#') {
+                continue;
+            }
+
+            const newScore = rotationCost(m.vector.direction, s.direction) + 1 + m.score;
+
+            const newPosition = s.point;
+            var path = std.ArrayList(Point).init(std.heap.page_allocator);
+            for (m.path) |p| {
+                try path.append(p);
+            }
+            try path.append(newPosition);
+            const nm = Movement{ .score = newScore, .vector = Vector{ .point = newPosition, .direction = s.direction }, .path = path.items };
+            try movements.add(nm);
         }
     }
 
-    print("The path with the lowest score has a score of {d}", .{score});
+    try movements.add(Movement{ .score = 0, .vector = Vector{ .point = reindeer, .direction = .right }, .path = emp.items });
+
+    while (movements.items.len > 0) {
+        const m = movements.remove();
+        if (m.score > bestScore) {
+            continue;
+        }
+
+        if (m.vector.point.x == goal.x and m.vector.point.y == goal.y) {
+            try ctx.createPath(m);
+            continue;
+        }
+
+        if (ctx.costs.get(m.vector)) |c| {
+            if (m.score == c) {
+                numberOfBestScores += 1;
+            } else {
+                continue;
+            }
+        }
+
+        try ctx.costs.put(m.vector, m.score);
+
+        var surroundings = std.ArrayList(Vector).init(std.heap.page_allocator);
+        defer surroundings.deinit();
+
+        for (directions) |direction| {
+            if (direction == reverse(m.vector.direction)) {
+                continue;
+            }
+            const v = velocity(direction);
+            try surroundings.append(Vector{ .point = ctx.getPoint(m.vector.point.x + v.dx, m.vector.point.y + v.dy), .direction = direction });
+        }
+
+        for (surroundings.items) |s| {
+            if (s.point.label == '#') {
+                continue;
+            }
+
+            const newScore = rotationCost(m.vector.direction, s.direction) + 1 + m.score;
+            if (newScore > bestScore) {
+                continue;
+            }
+
+            const newPosition = s.point;
+            var path = std.ArrayList(Point).init(std.heap.page_allocator);
+            for (m.path) |p| {
+                try path.append(p);
+            }
+            try path.append(newPosition);
+            const nm = Movement{ .score = newScore, .vector = Vector{ .point = newPosition, .direction = s.direction }, .path = path.items };
+            try movements.add(nm);
+        }
+    }
+
+    var warmseats = std.AutoArrayHashMap(Point, i64).init(std.heap.page_allocator);
+    defer warmseats.deinit();
+
+    for (ctx.paths.items) |path| {
+        // ctx.printPath(path);
+        for (0..path.path.len) |i| {
+            const p = path.path[i];
+            if (warmseats.get(p)) |s| {
+                try warmseats.put(p, s + 1);
+            } else {
+                try warmseats.put(p, 1);
+            }
+        }
+    }
+
+    var counter: i64 = 1;
+    for (warmseats.keys()) |s| {
+        if (warmseats.get(s)) |c| {
+            if (c > 0) counter += 1;
+        }
+    }
+
+    print("Best Score is {d} - Found {d} warm seats", .{ bestScore, counter });
+}
+
+fn sortMovements(context: void, a: Movement, b: Movement) std.math.Order {
+    _ = context;
+    return std.math.order(a.score, b.score);
 }
 
 const Point = struct {
@@ -79,9 +203,15 @@ const Point = struct {
     y: i64,
 };
 
+const Movement = struct {
+    score: i64,
+    vector: Vector,
+    path: []Point,
+};
+
 const Path = struct {
-    id: i64,
-    path: std.ArrayList(Point),
+    path: []Point,
+    lookup: std.AutoArrayHashMap(usize, Point),
     score: i64,
 };
 
@@ -95,7 +225,6 @@ const Map = struct {
     height: i64,
     bwidth: i64,
     bheight: i64,
-    points: []Point,
 };
 
 const Velocity = struct {
@@ -104,6 +233,13 @@ const Velocity = struct {
 };
 
 const Direction = enum(u8) { up = 0, down = 1, left = 2, right = 3 };
+
+const directions: [4]Direction = [_]Direction{
+    Direction.up,
+    Direction.down,
+    Direction.left,
+    Direction.right,
+};
 
 fn velocity(dir: Direction) Velocity {
     return switch (dir) {
@@ -114,7 +250,7 @@ fn velocity(dir: Direction) Velocity {
     };
 }
 
-fn turn(dir: Direction) Velocity {
+fn turn(dir: Direction) Direction {
     return switch (dir) {
         .left => .up,
         .right => .down,
@@ -123,12 +259,28 @@ fn turn(dir: Direction) Velocity {
     };
 }
 
+fn reverse(dir: Direction) Direction {
+    return switch (dir) {
+        .left => .right,
+        .right => .left,
+        .up => .down,
+        .down => .up,
+    };
+}
+
+fn rotationCost(dir: Direction, dir2: Direction) i64 {
+    if (dir == dir2) return 0;
+    if (dir == reverse(dir2)) return 2000;
+    return 1000;
+}
+
 const Context = struct {
     map: Map,
     reindeer: Point,
     goal: Point,
     points: []Point,
     paths: std.ArrayList(Path),
+    costs: std.AutoArrayHashMap(Vector, i64),
 
     fn getPoint(self: *Context, x: i64, y: i64) Point {
         return self.points[self.getIndex(x, y)];
@@ -148,46 +300,37 @@ const Context = struct {
         print("\n", .{});
     }
 
-    fn go(self: *Context, direction: Direction) !void {
-        var path = Path{ .id = 1, .path = std.ArrayList(Point).init(std.heap.page_allocator), .score = 0 };
+    fn createPath(self: *Context, movement: Movement) !void {
+        var points = std.ArrayList(Point).init(std.heap.page_allocator);
+        var lookup = std.AutoArrayHashMap(usize, Point).init(std.heap.page_allocator);
 
-        while (self.canWalk(&path, self.reindeer, direction)) {
-            self.walk(&path, self.reindeer, direction);
+        for (movement.path) |p| {
+            try points.insert(0, p);
+            try lookup.put(self.getIndex(p.x, p.y), p);
         }
+        // defer points.deinit();
+
+        try self.paths.append(Path{ .score = movement.score, .path = points.items, .lookup = lookup });
     }
 
-    fn canWalk(self: *Context, path: *Path, point: Point, direction: Direction) !bool {
-        const v = velocity(direction);
-        const np = self.getPoint(point.x + v.dx, point.y + v.dy);
-        if (np == self.goal) {
-            return false;
+    fn printPath(self: *Context, path: Path) void {
+        var index: usize = 0;
+        var yay: i64 = 0;
+        for (self.points) |c| {
+            if (path.lookup.get(index)) |_| {
+                std.debug.print("x", .{});
+                yay += 1;
+            } else {
+                std.debug.print("{c}", .{c.label});
+            }
+            if (c.x == self.map.bwidth) {
+                std.debug.print("\n", .{});
+            }
+            index += 1;
         }
-        if (path.points.contains(np)) {
-            return false;
-        }
-        if (np.label == '#') {
-            return false;
-        }
-        return true;
-    }
+        print("\n", .{});
 
-    fn walk(self: *Context, path: *Path, point: Point, direction: Direction) !bool {
-        if (!self.canWalk(path, point, direction)) {}
-        const v = velocity(direction);
-        const np = self.getPoint(point.x + v.dx, point.y + v.dy);
-        if (np == self.goal) {
-            return true;
-        }
-        if (path.points.contains(np)) {
-            return false;
-        }
-        if (np.label == '.') {
-            path.score += 1;
-            try path.points.append(np);
-            self.walk(path, np, direction);
-        } else if (np.label == '#') {
-            path.score += 1000;
-            self.walk(path, np, turn(direction));
-        }
+        print("Found {d} yays", .{yay});
+        print("Found {d} points", .{path.path.len});
     }
 };
