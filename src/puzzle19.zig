@@ -5,7 +5,7 @@ const deq = @import("deque.zig");
 const Task = enum { one, two };
 const DataSource = enum { sample, real };
 const task: Task = .one;
-const source: DataSource = .sample;
+const source: DataSource = .real;
 
 const verbose: bool = switch (source) {
     .sample => true,
@@ -23,6 +23,9 @@ pub fn puzzle() !void {
 
     var designs = std.ArrayList(Design).init(std.heap.page_allocator);
     defer designs.deinit();
+
+    var numberOfDesigns = std.StringHashMap(u64).init(std.heap.page_allocator);
+    defer numberOfDesigns.deinit();
 
     const file = @embedFile(filename);
     const split = std.mem.split;
@@ -51,11 +54,11 @@ pub fn puzzle() !void {
         index += 1;
     }
 
-    var ctx = Context{ .designs = designs.items, .patterns = patterns.items };
+    var ctx = Context{ .designs = designs.items, .patterns = patterns.items, .numberOfDesigns = numberOfDesigns };
 
     ctx.printShit();
 
-    ctx.checkDesigns();
+    try ctx.checkDesigns();
 }
 
 const Design = struct {
@@ -85,6 +88,7 @@ const Pattern = struct {
 const Context = struct {
     designs: []Design,
     patterns: []Pattern,
+    numberOfDesigns: std.StringHashMap(u64),
 
     fn printShit(self: *Context) void {
         print("Patterns:", .{});
@@ -109,26 +113,35 @@ const Context = struct {
         return null;
     }
 
-    fn checkDesigns(self: *Context) void {
-        var counter: i32 = 0;
+    fn checkDesigns(self: *Context) !void {
+        var counter: u64 = 0;
+        var counter2: u64 = 0;
         for (self.designs) |design| {
-            const num = self.checkDesign(design);
+            const num = try self.checkDesign(design);
+            counter2 += num;
             if (num > 0) {
                 counter += 1;
             }
         }
 
         print("Number of designs that are possible: {d}", .{counter});
+        print("Number of designs combinations: {d}", .{counter2});
     }
 
-    fn checkDesign(self: *Context, design: Design) i32 {
+    fn checkDesign(self: *Context, design: Design) !u64 {
         if (design.pattern.len == 0) {
-            return 0;
+            return 1;
         }
-        var total: i32 = 0;
+        if (self.numberOfDesigns.get(design.pattern)) |c| {
+            return c;
+        }
+        var total: u64 = 0;
         for (self.patterns) |p| {
             if (design.startsWith(p)) {
-                total += self.checkDesign(design.removePrefix(p));
+                const nd = design.removePrefix(p);
+                const nt = try self.checkDesign(nd);
+                total += nt;
+                try self.numberOfDesigns.put(nd.pattern, nt);
             }
         }
 
