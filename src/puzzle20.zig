@@ -7,12 +7,12 @@ const DataSource = enum { sample, real };
 const task: Task = .two;
 const source: DataSource = .real;
 
-const savingsAmount: i64 = switch (source) {
+const savings: i64 = switch (source) {
     .real => 100,
     .sample => 2,
 };
 
-const cheatLimit: i64 = switch (task) {
+const cheatDuration: i64 = switch (task) {
     .one => 2,
     .two => 20,
 };
@@ -100,7 +100,7 @@ pub fn puzzle() !void {
                 try cheats.append(CheatPoint{ .start = p, .end = n.point, .delta = delta });
             }
 
-            if (length < cheatLimit) {
+            if (length < cheatDuration) {
                 const nlength = length + 1;
 
                 for (directions) |d| {
@@ -122,11 +122,11 @@ pub fn puzzle() !void {
     print("Found {d} number of cheats", .{cheats.items.len});
 
     for (cheats.items) |cheat| {
-        if (cheat.delta >= savingsAmount) numberOfCheatsThatSaveAtleastSavingsAmount += 1;
-        if (cheat.delta == savingsAmount) numberOfCheatsThatSaveSavingsAmount += 1;
+        if (cheat.delta >= savings) numberOfCheatsThatSaveAtleastSavingsAmount += 1;
+        if (cheat.delta == savings) numberOfCheatsThatSaveSavingsAmount += 1;
     }
 
-    print("Best Score is {d} - Number of cheats that save {d} picoseconds: exact {d} atleast: {d}", .{ bestScore, savingsAmount, numberOfCheatsThatSaveSavingsAmount, numberOfCheatsThatSaveAtleastSavingsAmount });
+    print("Best Score is {d} - Number of cheats that save {d} picoseconds: exact {d} atleast: {d}", .{ bestScore, savings, numberOfCheatsThatSaveSavingsAmount, numberOfCheatsThatSaveAtleastSavingsAmount });
 }
 
 const Point = struct {
