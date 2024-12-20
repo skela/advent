@@ -61,11 +61,8 @@ pub fn puzzle() !void {
     }
     height = y;
 
-    var costs = std.AutoArrayHashMap(Vector, i64).init(std.heap.page_allocator);
-    defer costs.deinit();
-
     const map = Map{ .width = width, .height = height, .bwidth = width - 1, .bheight = height - 1 };
-    var ctx = Context{ .map = map, .start = start, .goal = goal, .points = points.items, .paths = std.ArrayList(Path).init(std.heap.page_allocator), .costs = costs };
+    var ctx = Context{ .map = map, .start = start, .goal = goal, .points = points.items };
     ctx.printMap();
 
     const distanceFromStart = try ctx.walk(ctx.start);
@@ -104,7 +101,7 @@ pub fn puzzle() !void {
                 const nlength = length + 1;
 
                 for (directions) |d| {
-                    if (ctx.getPointChange(n.point, d, 1)) |nn| {
+                    if (ctx.getPointChange(n.point, d)) |nn| {
                         const v = if (visited.get(nn)) |ov| ov else 0;
                         if (v == 0 or v > nlength) {
                             try visited.put(nn, nlength);
@@ -135,12 +132,6 @@ const Point = struct {
     y: i64,
 };
 
-const Movement = struct {
-    score: i64,
-    vector: Vector,
-    path: std.ArrayList(Point),
-};
-
 const LengthPoint = struct {
     length: i64,
     point: Point,
@@ -150,18 +141,6 @@ const CheatPoint = struct {
     start: Point,
     end: Point,
     delta: i64,
-};
-
-const Path = struct {
-    path: []Point,
-    lookup: std.AutoArrayHashMap(usize, Point),
-    score: i64,
-};
-
-const Vector = struct {
-    point: Point,
-    direction: Direction,
-    cost: i64,
 };
 
 const Map = struct {
@@ -175,11 +154,6 @@ const Velocity = struct {
     dx: i64,
     dy: i64,
 };
-
-fn rotationCost(dir: Direction, dir2: Direction) i64 {
-    if (dir == dir2) return 0;
-    return 1;
-}
 
 const Direction = enum(u8) { up = 0, down = 1, left = 2, right = 3 };
 
@@ -199,45 +173,11 @@ fn velocity(dir: Direction) Velocity {
     };
 }
 
-fn velocityScale(dir: Direction, scale: i64) Velocity {
-    return switch (dir) {
-        .left => Velocity{ .dx = -scale, .dy = 0 },
-        .right => Velocity{ .dx = scale, .dy = 0 },
-        .up => Velocity{ .dx = 0, .dy = -scale },
-        .down => Velocity{ .dx = 0, .dy = scale },
-    };
-}
-
-fn turn(dir: Direction) Direction {
-    return switch (dir) {
-        .left => .up,
-        .right => .down,
-        .up => .right,
-        .down => .left,
-    };
-}
-
-fn reverse(dir: Direction) Direction {
-    return switch (dir) {
-        .left => .right,
-        .right => .left,
-        .up => .down,
-        .down => .up,
-    };
-}
-
-fn sortMovements(context: void, a: Movement, b: Movement) std.math.Order {
-    _ = context;
-    return std.math.order(a.score, b.score);
-}
-
 const Context = struct {
     map: Map,
     start: Point,
     goal: Point,
     points: []Point,
-    paths: std.ArrayList(Path),
-    costs: std.AutoArrayHashMap(Vector, i64),
 
     fn getPoint(self: *Context, x: i64, y: i64) Point {
         return self.points[self.getIndex(x, y)];
@@ -247,24 +187,20 @@ const Context = struct {
         return @intCast(y * self.map.width + x);
     }
 
-    fn getPointChange(self: *Context, p: Point, dir: Direction, scale: i64) ?Point {
-        const v = velocityScale(dir, scale);
+    fn getPointChange(self: *Context, p: Point, dir: Direction) ?Point {
+        const v = velocity(dir);
         switch (dir) {
             .up => {
                 if (p.y == 0) return null;
-                if (scale == 2 and p.y == 1) return null;
             },
             .down => {
                 if (p.y == self.map.bheight) return null;
-                if (scale == 2 and p.y == self.map.bheight - 1) return null;
             },
             .left => {
                 if (p.x == 0) return null;
-                if (scale == 2 and p.x == 1) return null;
             },
             .right => {
                 if (p.x == self.map.bwidth) return null;
-                if (scale == 2 and p.x == self.map.bwidth - 1) return null;
             },
         }
         return getPoint(self, p.x + v.dx, p.y + v.dy);
@@ -295,7 +231,7 @@ const Context = struct {
             const p = if (queue.popBack()) |k| k else continue;
 
             for (directions) |direction| {
-                if (self.getPointChange(p, direction, 1)) |np| {
+                if (self.getPointChange(p, direction)) |np| {
                     if (np.label == '#') continue;
                     const ni = self.getIndex(np.x, np.y);
                     const pi = self.getIndex(p.x, p.y);
