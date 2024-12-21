@@ -1,11 +1,8 @@
 const std = @import("std");
 pub const print = @import("utils.zig").print;
-const deq = @import("deque.zig");
 
-const Task = enum { one, two };
 const DataSource = enum { sample, sample2, real };
-const task: Task = .one;
-const source: DataSource = .sample;
+const source: DataSource = .real;
 
 const verbose: bool = switch (source) {
     .sample => true,
