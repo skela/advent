@@ -25,7 +25,7 @@ const filename: []const u8 = switch (source) {
 };
 
 pub fn puzzle() !void {
-    var buyers = std.ArrayList(i64).init(std.heap.page_allocator);
+    var buyers = std.ArrayList(i64).init(alloc);
     defer buyers.deinit();
 
     const file = @embedFile(filename);
@@ -35,7 +35,7 @@ pub fn puzzle() !void {
         if (line.len == 0) {
             continue;
         }
-        const buyer: i64 = try parseNumber(line);
+        const buyer: i64 = try utils.parsei64(line);
         try buyers.append(buyer);
     }
 
@@ -56,14 +56,13 @@ pub fn puzzle() !void {
     // print("{d}", .{calc(123, 9)});
 
     var possibleSequences = std.AutoArrayHashMap(Sequence, i64).init(alloc);
-
     defer possibleSequences.deinit();
 
     for (buyers.items) |secretNumber| {
         var alreadyAdded = std.AutoArrayHashMap(Sequence, bool).init(alloc);
-        var runningSequence = std.ArrayList(i64).init(alloc);
-
         defer alreadyAdded.deinit();
+
+        var runningSequence = std.ArrayList(i64).init(alloc);
         defer runningSequence.deinit();
 
         var previousSecretNumber = secretNumber;
@@ -129,10 +128,6 @@ fn prune(secret: i64) i64 {
 
 fn bananas(num: i64) i64 {
     return @intCast(@abs(num) % 10);
-}
-
-fn parseNumber(input: []const u8) !i64 {
-    return try std.fmt.parseInt(i64, input, 10);
 }
 
 const Sequence = struct {
