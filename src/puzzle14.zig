@@ -1,5 +1,6 @@
 const std = @import("std");
-pub const print = @import("utils.zig").print;
+pub const utils = @import("utils.zig");
+pub const print = utils.print;
 
 const Task = enum { one, two };
 const task: Task = Task.two;
@@ -113,7 +114,7 @@ pub fn puzzle() !void {
 }
 
 fn parseNumber(input: []const u8) !i64 {
-    return try std.fmt.parseInt(i64, input, 10);
+    return try utils.parsei64(input);
 }
 
 const Robot = struct {

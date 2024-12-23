@@ -1,5 +1,6 @@
 const std = @import("std");
-pub const print = @import("utils.zig").print;
+pub const utils = @import("utils.zig");
+pub const print = utils.print;
 
 const Task = enum { one, two };
 const task: Task = Task.two;
@@ -115,7 +116,7 @@ fn parsePrize(line: []const u8) !Prize {
 }
 
 fn parseNumber(input: []const u8) !i64 {
-    return try std.fmt.parseInt(i64, input, 10);
+    return try utils.parsei64(input);
 }
 
 const Button = struct {

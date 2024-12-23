@@ -1,5 +1,6 @@
 const std = @import("std");
-pub const print = @import("utils.zig").print;
+pub const utils = @import("utils.zig");
+pub const print = utils.print;
 
 const Task = enum { one, two };
 const DataSource = enum { sample, sample2, real };
@@ -42,7 +43,7 @@ pub fn puzzle() !void {
             const p_c = std.mem.indexOf(u8, line, ":");
             const p_ci = if (p_c) |i| i else 0;
             const w = line[p_ci + 2 ..];
-            const px = try parseNumber(w);
+            const px = try utils.parseu64(w);
             switch (regcounter) {
                 0 => regA = px,
                 1 => regB = px,
@@ -56,7 +57,7 @@ pub fn puzzle() !void {
             const suffix = line[p_ci + 2 ..];
             var comps = split(u8, suffix, ",");
             while (comps.next()) |c| {
-                const p = try parseNumber(c);
+                const p = try utils.parseu64(c);
                 const e: Program = switch (p) {
                     0 => .zero,
                     1 => .one,
@@ -132,10 +133,6 @@ pub fn puzzle() !void {
             std.debug.print("{d},", .{v});
         }
     }
-}
-
-fn parseNumber(input: []const u8) !u64 {
-    return try std.fmt.parseInt(u64, input, 10);
 }
 
 const Div = struct {

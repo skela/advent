@@ -1,5 +1,6 @@
 const std = @import("std");
-pub const print = @import("utils.zig").print;
+pub const utils = @import("utils.zig");
+pub const print = utils.print;
 const deq = @import("deque.zig");
 
 const Task = enum { one, two };
@@ -43,8 +44,8 @@ pub fn puzzle() !void {
         const p_ci = if (p_c) |i| i else 0;
         const wx = line[0..p_ci];
         const wy = line[p_ci + 1 ..];
-        const px = try parseNumber(wx);
-        const py = try parseNumber(wy);
+        const px = try utils.parsei32(wx);
+        const py = try utils.parsei32(wy);
         try corruptions.append(Point{ .x = px, .y = py, .label = '#' });
     }
 
@@ -118,10 +119,6 @@ fn velocity(dir: Direction) Velocity {
         .up => Velocity{ .dx = 0, .dy = -1 },
         .down => Velocity{ .dx = 0, .dy = 1 },
     };
-}
-
-fn parseNumber(input: []const u8) !i32 {
-    return try std.fmt.parseInt(i32, input, 10);
 }
 
 const Context = struct {
