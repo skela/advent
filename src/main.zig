@@ -21,8 +21,8 @@ const std = @import("std");
 // pub const puzzle = @import("puzzle20.zig");
 // pub const puzzle = @import("puzzle21.zig");
 // pub const puzzle = @import("puzzle22.zig");
-pub const puzzle = @import("puzzle23.zig");
-// pub const puzzle = @import("puzzle24.zig");
+// pub const puzzle = @import("puzzle23.zig");
+pub const puzzle = @import("puzzle24.zig");
 // pub const puzzle = @import("puzzle25.zig");
 
 pub fn main() !void {
